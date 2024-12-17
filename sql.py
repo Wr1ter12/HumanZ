@@ -18,12 +18,6 @@ class db:
             'CREATE TABLE IF NOT EXISTS workplaces ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, address TEXT NOT NULL);')
         self.cursor.execute(
             'CREATE TABLE IF NOT EXISTS positions ( id INTEGER PRIMARY KEY AUTOINCREMENT, profession TEXT NOT NULL, salary INTEGER NOT NULL);')
-
-        #self.cursor.execute('INSERT INTO Users VALUES (3, "root", "root", "admin", "ABCVDO")')
-        #self.cursor.execute('INSERT INTO workplaces VALUES (1, "Офис ЖТБ", "ул. Волынина 8")')
-        #self.cursor.execute('INSERT INTO positions VALUES (1, "Администратор баз данных", 50000)')
-        #self.cursor.execute('INSERT INTO workplaces VALUES (2, "Офис Серб", "ул. Волынина 8")')
-        #self.cursor.execute('INSERT INTO positions VALUES (2, "Разработчик .NET", 75000)')
         self.connection.commit()
 
     def selectUser(self, login):
@@ -147,6 +141,17 @@ class db:
 
         return result
 
+    def selectLogsBy(self, msg):
+        if msg == "" or msg == "Поиск...":
+            cursor = self.connection.execute('SELECT * FROM Logs')
+            return cursor.fetchall()
+
+        cursor = self.connection.execute(
+            '''SELECT * FROM Logs WHERE id LIKE "%''' + msg + '''%" OR log LIKE "%''' + msg + '''%" 
+                                                OR date LIKE "%''' + msg + '''%" OR user LIKE "%''' + msg + '''%"''')
+        result = cursor.fetchall()
+        return result
+
     def deleteEmployee(self, last_name, phone, email, date):
         cursor = self.connection.execute("UPDATE Employees SET dateOfFiring = " + date + " AND status='Увольнение' WHERE (last_name=? AND phone=? AND email=?)", (last_name, phone, email))
         self.connection.commit()
@@ -154,6 +159,20 @@ class db:
     def deleteIntern(self, last_name, phone, email, date):
         cursor = self.connection.execute("UPDATE interns SET dateOfFiring = " + date + ", status='Увольнение' WHERE (last_name=? AND phone=? AND email=?)", (last_name, phone, email))
         self.connection.commit()
+
+    def updateTable(self, l, p, e, table, last_name, first_name, middle_name, phone, email, posId, experience, offId):
+        if table == 0:
+            cursor = self.connection.execute(
+                "UPDATE employees SET last_name=?, first_name=?, middle_name=?, phone=?, email=?, positionId=?, "
+                "experience=?, workplaceId=? WHERE (last_name=? AND phone=? AND email=?)",
+                (last_name, first_name, middle_name, phone, email, posId, experience, offId, l, p, e))
+        else:
+            cursor = self.connection.execute(
+                "UPDATE interns SET last_name=?, first_name=?, middle_name=?, phone=?, email=?, positionId=?, "
+                "experience=?, workplaceId=? WHERE (last_name=? AND phone=? AND email=?)",
+                (last_name, first_name, middle_name, phone, email, posId, experience, offId, l, p, e))
+        self.connection.commit()
+        return True
 
     def acceptIntern(self, last_name, phone, email, dateOfHiring):
         cursor = self.connection.execute("""INSERT INTO Employees (last_name, first_name, middle_name, phone, 

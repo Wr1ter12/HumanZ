@@ -16,6 +16,7 @@ doc = docWriter()
 
 current_user = "guest"
 
+
 class Window(QWidget):
 
     def __init__(self):
@@ -85,6 +86,7 @@ class LoginWindow(Window):
         else:
             QMessageBox.critical(self, 'Ошибка', 'Некорректный логин!')
 
+
 class RecoveryWindow(Window):
 
     def __init__(self):
@@ -125,11 +127,18 @@ class RecoveryWindow(Window):
         else:
             QMessageBox.critical(self, 'Ошибка', 'Некорректный логин!')
 
+
 class EditWindow(Window):
 
-    def __init__(self, row, table):
+    def __init__(self, tab, row, table):
         super().__init__()
         self.setFixedSize(700, 340)
+
+        self.l = row[0]
+        self.p = row[3]
+        self.e = row[4]
+        self.table = table
+        self.tab = tab
 
         formAdd = QWidget(self)
         FormLayout = QFormLayout(formAdd)
@@ -183,7 +192,7 @@ class EditWindow(Window):
         button = QMessageBox.question(
             self,
             'Подтверждение',
-            'Вы уверены, что хотите переместить выделенную строку?',
+            'Вы уверены, что хотите изменить выделенную строку?',
             QMessageBox.StandardButton.Yes |
             QMessageBox.StandardButton.No
         )
@@ -194,8 +203,22 @@ class EditWindow(Window):
 
             position = self.position.currentIndex() + 1
             workplace = self.workplace.currentIndex() + 1
-            today = str(date.today().strftime('%d.%m.%Y'))
 
+            db.updateTable(self.l, self.p, self.e, self.table, self.last_name.text().strip(),
+                           self.first_name.text().strip(),
+                           self.middle_name.text().strip(),
+                           self.phone.text().strip(), self.email.text().strip(), position,
+                           self.experience.text().strip(), workplace)
+            db.insertLog("Изменение строки " + self.l,
+                         str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(
+                             date.today().strftime('%d.%m.%Y')), current_user)
+        try:
+            if self.table == 0:
+                self.tab.getEmployees("")
+            else:
+                self.tab.getInterns("")
+        except:
+            pass
 
     def valid(self):
         first_name = self.first_name.text().strip()
@@ -255,6 +278,7 @@ class EditWindow(Window):
         self.email.clear()
         self.experience.clear()
 
+
 class MainWindow(Window):
 
     def __init__(self, permission):
@@ -278,11 +302,22 @@ class MainWindow(Window):
         loginWindow = None
         loginWindow = LoginWindow()
 
+
 class LogWindow(Window):
 
     def __init__(self):
         super().__init__()
         self.setFixedSize(500, 250)
+
+        self.inputSearch = QLineEdit()
+        self.inputSearch.setPlaceholderText("Найти...")
+        self.layout.addWidget(self.inputSearch, 0, 0, 1, 2, Qt.AlignmentFlag.AlignTop)
+        self.inputSearch.setFixedSize(370, 35)
+
+        buttonSearch = QPushButton("Поиск")
+        buttonSearch.clicked.connect(lambda: self.getLogs(self.inputSearch.text()))
+        buttonSearch.setFixedSize(90, 35)
+        self.layout.addWidget(buttonSearch, 0, 1, Qt.AlignmentFlag.AlignTop)
 
         logs = db.selectLogs()
 
@@ -328,6 +363,26 @@ class LogWindow(Window):
             self.tableLogs.setItem(row, 1, QTableWidgetItem(l[2]))
             self.tableLogs.setItem(row, 2, QTableWidgetItem(l[3]))
             row += 1
+
+    def getLogs(self, msg):
+        log = db.selectLogsBy(msg)
+        l = len(log)
+        if l > 0:
+            self.clearTable(self.tableLogs)
+            self.tableLogs.setRowCount(l)
+
+            row = 0
+            for l in log:
+                self.tableLogs.setItem(row, 0, QTableWidgetItem(l[1]))
+                self.tableLogs.setItem(row, 1, QTableWidgetItem(l[2]))
+                self.tableLogs.setItem(row, 2, QTableWidgetItem(l[3]))
+                row += 1
+            return 0
+        QMessageBox.critical(self, 'Ошибка', 'Нет таких событий!')
+
+    def clearTable(self, table):
+        while table.rowCount() > 0:
+            table.removeRow(0)
 
 class TabWidget(QWidget):
 
@@ -379,7 +434,6 @@ class TabWidget(QWidget):
 
         self.tableEmployees.setHorizontalHeaderLabels(
             ("Фамилия", "Имя", "Отчество", "Телефон", "Почта", "Должность", "Опыт", "Адрес"))
-
 
         self.tableEmployees.hide()
 
@@ -498,7 +552,7 @@ class TabWidget(QWidget):
         buttonQuit = QPushButton("Выйти из системы")
         buttonQuit.clicked.connect(MainWindow.quit)
         self.layoutTab.addWidget(buttonQuit, 2, 0,
-                              alignment=Qt.AlignmentFlag.AlignLeft)
+                                 alignment=Qt.AlignmentFlag.AlignLeft)
 
         if permission == "admin":
             buttonQuit = QPushButton("Журнал событий")
@@ -542,14 +596,19 @@ class TabWidget(QWidget):
                 if not doc.docDismissal(table.item(current_row, 0).text(), table.item(current_row, 1).text(),
                                         table.item(current_row, 2).text(), str(date.today().strftime('%d.%m.%Y')),
                                         table.item(current_row, 5).text()):
-                    return QMessageBox.critical(self, 'Ошибка', 'Уберите существующий приказ об увольнении из папки "Документы"')
+                    return QMessageBox.critical(self, 'Ошибка',
+                                                'Уберите существующий приказ об увольнении из папки "Документы"')
                 db.deleteEmployee(table.item(current_row, 0).text(), table.item(current_row, 3).text(),
                                   table.item(current_row, 4).text(), str(date.today().strftime('%d.%m.%Y')))
-                db.insertLog("Удаление сотрудника " + table.item(current_row, 0).text(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')), current_user)
+                db.insertLog("Удаление сотрудника " + table.item(current_row, 0).text(),
+                             str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(
+                                 date.today().strftime('%d.%m.%Y')), current_user)
             elif table == self.tableInterns:
                 db.deleteIntern(table.item(current_row, 0).text(), table.item(current_row, 3).text(),
-                                   table.item(current_row, 4).text(), str(date.today().strftime('%d.%m.%Y')))
-                db.insertLog("Удаление стажера " + table.item(current_row, 0).text(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+                                table.item(current_row, 4).text(), str(date.today().strftime('%d.%m.%Y')))
+                db.insertLog("Удаление стажера " + table.item(current_row, 0).text(),
+                             str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(
+                                 date.today().strftime('%d.%m.%Y')),
                              current_user)
             table.removeRow(current_row)
             if table.rowCount() <= 0:
@@ -575,13 +634,19 @@ class TabWidget(QWidget):
         )
 
         if button == QMessageBox.StandardButton.Yes:
-            if not doc.docHiring(self.tableInterns.item(current_row, 0).text(), self.tableInterns.item(current_row, 1).text(),
-                                    self.tableInterns.item(current_row, 2).text(), str(date.today().strftime('%d.%m.%Y')),
-                                    self.tableInterns.item(current_row, 5).text(), str(db.getSalaryByProfession(self.tableInterns.item(current_row, 5).text()))):
-                return QMessageBox.critical(self, 'Ошибка', 'Уберите существующий приказ о зачислении из папки "Документы"')
-            db.acceptIntern(self.tableInterns.item(current_row, 0).text(), self.tableInterns.item(current_row, 3).text(),
-                               self.tableInterns.item(current_row, 4).text(), str(date.today().strftime('%d.%m.%Y')))
-            db.insertLog("Перемещение стажера " + self.tableInterns.item(current_row, 0).text(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+            if not doc.docHiring(self.tableInterns.item(current_row, 0).text(),
+                                 self.tableInterns.item(current_row, 1).text(),
+                                 self.tableInterns.item(current_row, 2).text(), str(date.today().strftime('%d.%m.%Y')),
+                                 self.tableInterns.item(current_row, 5).text(),
+                                 str(db.getSalaryByProfession(self.tableInterns.item(current_row, 5).text()))):
+                return QMessageBox.critical(self, 'Ошибка',
+                                            'Уберите существующий приказ о зачислении из папки "Документы"')
+            db.acceptIntern(self.tableInterns.item(current_row, 0).text(),
+                            self.tableInterns.item(current_row, 3).text(),
+                            self.tableInterns.item(current_row, 4).text(), str(date.today().strftime('%d.%m.%Y')))
+            db.insertLog("Перемещение стажера " + self.tableInterns.item(current_row, 0).text(),
+                         str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(
+                             date.today().strftime('%d.%m.%Y')),
                          current_user)
 
             row = self.tableEmployees.rowCount()
@@ -624,7 +689,7 @@ class TabWidget(QWidget):
             row.append(table.item(current_row, i).text())
 
         editWindow = None
-        editWindow = EditWindow(row, tbl)
+        editWindow = EditWindow(self, row, tbl)
 
     def addRow(self):
         if not self.valid():
@@ -638,15 +703,19 @@ class TabWidget(QWidget):
             table = self.tableEmployees
             txt = self.lblEmp
             if not doc.docHiring(self.last_name.text().strip(), self.first_name.text().strip(),
-                                    self.middle_name.text().strip(), today,
-                                    self.position.currentText(), str(db.getSalaryByProfession(self.position.currentText()))):
-                return QMessageBox.critical(self, 'Ошибка', 'Уберите существующий приказ о зачислении из папки "Документы"')
+                                 self.middle_name.text().strip(), today,
+                                 self.position.currentText(),
+                                 str(db.getSalaryByProfession(self.position.currentText()))):
+                return QMessageBox.critical(self, 'Ошибка',
+                                            'Уберите существующий приказ о зачислении из папки "Документы"')
             if db.insertEmployee(self.last_name.text().strip(), self.first_name.text().strip(),
                                  self.middle_name.text().strip(),
                                  self.phone.text().strip(), self.email.text().strip(), position,
                                  self.experience.text().strip(), workplace, today):
                 QMessageBox.information(self, 'Успешно', 'Новый сотрудник успешно добавлен!')
-                db.insertLog("Добавление сотрудника " + self.last_name.text().strip(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+                db.insertLog("Добавление сотрудника " + self.last_name.text().strip(),
+                             str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(
+                                 date.today().strftime('%d.%m.%Y')),
                              current_user)
             else:
                 QMessageBox.critical(self, 'Ошибка', 'Данный сотрудник уже есть в базе данных!')
@@ -655,11 +724,13 @@ class TabWidget(QWidget):
             table = self.tableInterns
             txt = self.lblInterns
             if db.insertIntern(self.last_name.text().strip(), self.first_name.text().strip(),
-                                  self.middle_name.text().strip(),
-                                  self.phone.text().strip(), self.email.text().strip(), position,
-                                  self.experience.text().strip(), workplace, today):
+                               self.middle_name.text().strip(),
+                               self.phone.text().strip(), self.email.text().strip(), position,
+                               self.experience.text().strip(), workplace, today):
                 QMessageBox.information(self, 'Успешно', 'Новый стажер успешно добавлен!')
-                db.insertLog("Добавление стажера " + self.last_name.text().strip(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+                db.insertLog("Добавление стажера " + self.last_name.text().strip(),
+                             str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(
+                                 date.today().strftime('%d.%m.%Y')),
                              current_user)
             else:
                 QMessageBox.critical(self, 'Ошибка', 'Данный стажер уже есть в базе данных!')
@@ -686,9 +757,12 @@ class TabWidget(QWidget):
         if not self.validUser():
             return
 
-        if db.insertUser(self.loginForm.text().strip(), self.passwordForm.text().strip(), self.codewordForm.text().strip().upper()):
+        if db.insertUser(self.loginForm.text().strip(), self.passwordForm.text().strip(),
+                         self.codewordForm.text().strip().upper()):
             QMessageBox.information(self, 'Успешно', 'Новый пользователь успешно добавлен!')
-            db.insertLog("Добавление пользователя " + self.loginForm.text().strip(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+            db.insertLog("Добавление пользователя " + self.loginForm.text().strip(),
+                         str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(
+                             date.today().strftime('%d.%m.%Y')),
                          current_user)
 
         self.resetFormUser()
