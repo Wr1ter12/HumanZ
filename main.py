@@ -1,5 +1,5 @@
 import sys
-from datetime import date
+from datetime import date, datetime
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
@@ -13,6 +13,8 @@ from document import docWriter
 
 db = db("HumanZDatabase.db")
 doc = docWriter()
+
+current_user = "guest"
 
 class Window(QWidget):
 
@@ -69,11 +71,14 @@ class LoginWindow(Window):
         recoveryWindow = RecoveryWindow()
 
     def login(self):
+        global current_user
+
         login = db.selectUser(self.loginInput.text())
         if login:
             if self.passwordInput.text() == login[2]:
                 self.mainWindow = MainWindow(login[3])
                 self.mainWindow.show()
+                current_user = login[1]
                 self.close()
             else:
                 QMessageBox.critical(self, 'Ошибка', 'Некорректный пароль!')
@@ -120,6 +125,136 @@ class RecoveryWindow(Window):
         else:
             QMessageBox.critical(self, 'Ошибка', 'Некорректный логин!')
 
+class EditWindow(Window):
+
+    def __init__(self, row, table):
+        super().__init__()
+        self.setFixedSize(700, 340)
+
+        formAdd = QWidget(self)
+        FormLayout = QFormLayout(formAdd)
+        formAdd.setLayout(FormLayout)
+
+        self.last_name = QLineEdit(formAdd)
+        self.last_name.setText(row[0])
+        self.first_name = QLineEdit(formAdd)
+        self.first_name.setText(row[1])
+        self.middle_name = QLineEdit(formAdd)
+        self.middle_name.setText(row[2])
+        self.phone = QLineEdit(formAdd)
+        self.phone.setText(row[3])
+        self.email = QLineEdit(formAdd)
+        self.email.setText(row[4])
+        self.position = QComboBox(formAdd)
+        p = db.selectPositions()
+        self.position.addItems(i[0] for i in p)
+        index = self.position.findText(row[5])
+        self.position.setCurrentIndex(index)
+        self.experience = QLineEdit(formAdd)
+        self.experience.setText(row[6])
+        self.workplace = QComboBox(formAdd)
+        o = db.selectWorkplaces()
+        self.workplace.addItems(i[0] for i in o)
+        index = self.workplace.findText(row[7])
+        self.workplace.setCurrentIndex(index)
+
+        FormLayout.addRow('Фамилия:', self.last_name)
+        FormLayout.addRow('Имя:', self.first_name)
+        FormLayout.addRow('Отчество:', self.middle_name)
+        FormLayout.addRow('Телефон:', self.phone)
+        FormLayout.addRow('Почта:', self.email)
+        FormLayout.addRow('Должность', self.position)
+        FormLayout.addRow('Опыт:', self.experience)
+        FormLayout.addRow('Адрес работы:', self.workplace)
+
+        buttonChange = QPushButton('Изменить')
+        buttonChange.clicked.connect(self.editRow)
+        FormLayout.addRow(buttonChange)
+
+        self.layout.addWidget(formAdd)
+
+        self.show()
+
+        for w in self.findChildren(QWidget):
+            shadow = QGraphicsDropShadowEffect(blurRadius=30, xOffset=0, yOffset=0)
+            w.setGraphicsEffect(shadow)
+
+    def editRow(self):
+        button = QMessageBox.question(
+            self,
+            'Подтверждение',
+            'Вы уверены, что хотите переместить выделенную строку?',
+            QMessageBox.StandardButton.Yes |
+            QMessageBox.StandardButton.No
+        )
+
+        if button == QMessageBox.StandardButton.Yes:
+            if not self.valid():
+                return
+
+            position = self.position.currentIndex() + 1
+            workplace = self.workplace.currentIndex() + 1
+            today = str(date.today().strftime('%d.%m.%Y'))
+
+
+    def valid(self):
+        first_name = self.first_name.text().strip()
+        last_name = self.last_name.text().strip()
+        phone = self.phone.text().strip()
+        email = self.email.text().strip()
+
+        if not first_name:
+            QMessageBox.critical(self, 'Ошибка', 'Введите имя!')
+            self.first_name.setFocus()
+            return False
+
+        if not last_name:
+            QMessageBox.critical(self, 'Ошибка', 'Введите фамилию!')
+            self.last_name.setFocus()
+            return False
+
+        if not phone:
+            QMessageBox.critical(self, 'Ошибка', 'Введите номер телефона!')
+            self.phone.setFocus()
+            return False
+
+        if not match(r'^\+?[1-9]\d{1,14}$', phone) or not len(phone) >= 7 or not len(phone) <= 15:
+            QMessageBox.critical(self, 'Ошибка', 'Некорректный формат номера телефона!')
+            self.phone.setFocus()
+            return False
+
+        if not phone.startswith("8") and not phone.startswith("7") and not phone.startswith("+7"):
+            QMessageBox.critical(self, 'Ошибка', 'Некорректный формат номера телефона!')
+            self.phone.setFocus()
+            return False
+
+        if not match(r"^[\w\.\+\-]+\@[\w]+\.[a-z]{2,3}$", email):
+            QMessageBox.critical(self, 'Ошибка', 'Некорректный формат почты!')
+            self.email.setFocus()
+            return False
+
+        try:
+            experience = int(self.experience.text().strip())
+        except ValueError:
+            QMessageBox.critical(self, 'Ошибка', 'Недопустимое значение опыта!')
+            self.experience.setFocus()
+            return False
+
+        if experience < 0 or experience > 150:
+            QMessageBox.critical(self, 'Ошибка', 'Недопустимое значение опыта!')
+            self.experience.setFocus()
+            return False
+
+        return True
+
+    def resetForm(self):
+        self.first_name.clear()
+        self.last_name.clear()
+        self.middle_name.clear()
+        self.phone.clear()
+        self.email.clear()
+        self.experience.clear()
+
 class MainWindow(Window):
 
     def __init__(self, permission):
@@ -133,12 +268,66 @@ class MainWindow(Window):
             shadow = QGraphicsDropShadowEffect(blurRadius=25, xOffset=0, yOffset=0)
             w.setGraphicsEffect(shadow)
 
+    def toLogWindow(self):
+        global logWindow
+        logWindow = None
+        logWindow = LogWindow()
 
     def quit(self):
         global loginWindow
         loginWindow = None
         loginWindow = LoginWindow()
 
+class LogWindow(Window):
+
+    def __init__(self):
+        super().__init__()
+        self.setFixedSize(500, 250)
+
+        logs = db.selectLogs()
+
+        self.tableLogs = QTableWidget(self)
+        self.tableLogs.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.tableLogs.setFixedSize(480, 220)
+        self.layout.addWidget(self.tableLogs, 1, 0, Qt.AlignmentFlag.AlignTop)
+
+        self.tableLogs.setColumnCount(3)
+        self.tableLogs.setColumnWidth(0, 240)
+        self.tableLogs.setColumnWidth(1, 123)
+        self.tableLogs.setColumnWidth(2, 100)
+
+        self.tableLogs.setHorizontalHeaderLabels(
+            ("Событие", "Дата", "Пользователь"))
+
+        self.tableLogs.hide()
+
+        self.lblLogs = QLabel("События отсутствуют")
+        self.lblLogs.setProperty("class", "heading")
+        self.layout.addWidget(self.lblLogs, 0, 0, 1, 2, Qt.AlignmentFlag.AlignCenter)
+
+        if logs is not None and logs != []:
+            self.tableLogs.show()
+            self.lblLogs.hide()
+
+            self.getLogsTable(logs)
+        else:
+            self.lblLogs.show()
+
+        self.show()
+
+        for w in self.findChildren(QWidget):
+            shadow = QGraphicsDropShadowEffect(blurRadius=30, xOffset=0, yOffset=0)
+            w.setGraphicsEffect(shadow)
+
+    def getLogsTable(self, logs):
+        self.tableLogs.setRowCount(len(logs))
+
+        row = 0
+        for l in logs:
+            self.tableLogs.setItem(row, 0, QTableWidgetItem(l[1]))
+            self.tableLogs.setItem(row, 1, QTableWidgetItem(l[2]))
+            self.tableLogs.setItem(row, 2, QTableWidgetItem(l[3]))
+            row += 1
 
 class TabWidget(QWidget):
 
@@ -172,10 +361,12 @@ class TabWidget(QWidget):
         self.contextMenu = QMenu(self)
         act1 = self.contextMenu.addAction("Переместить в сотрудники")
         act1.triggered.connect(self.acceptRow)
+        act2 = self.contextMenu.addAction("Изменить данные")
+        act2.triggered.connect(self.toEditWindow)
 
         if self.perm == "admin":
-            act2 = self.contextMenu.addAction("Удалить")
-            act2.triggered.connect(self.deleteRow)
+            act3 = self.contextMenu.addAction("Удалить")
+            act3.triggered.connect(self.deleteRow)
 
         employees = db.selectEmployeesBy("")
 
@@ -309,6 +500,12 @@ class TabWidget(QWidget):
         self.layoutTab.addWidget(buttonQuit, 2, 0,
                               alignment=Qt.AlignmentFlag.AlignLeft)
 
+        if permission == "admin":
+            buttonQuit = QPushButton("Журнал событий")
+            buttonQuit.clicked.connect(MainWindow.toLogWindow)
+            self.layoutTab.addWidget(buttonQuit, 2, 0,
+                                     alignment=Qt.AlignmentFlag.AlignRight)
+
         for w in self.findChildren(QWidget):
             shadow = QGraphicsDropShadowEffect(blurRadius=25, xOffset=0, yOffset=0)
             w.setGraphicsEffect(shadow)
@@ -317,6 +514,8 @@ class TabWidget(QWidget):
         self.contextMenu.exec(event.globalPos())
 
     def deleteRow(self):
+        global current_user
+
         if self.tab.currentIndex() == 0:
             table = self.tableEmployees
             txt = self.lblEmp
@@ -346,9 +545,12 @@ class TabWidget(QWidget):
                     return QMessageBox.critical(self, 'Ошибка', 'Уберите существующий приказ об увольнении из папки "Документы"')
                 db.deleteEmployee(table.item(current_row, 0).text(), table.item(current_row, 3).text(),
                                   table.item(current_row, 4).text(), str(date.today().strftime('%d.%m.%Y')))
+                db.insertLog("Удаление сотрудника " + table.item(current_row, 0).text(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')), current_user)
             elif table == self.tableInterns:
                 db.deleteIntern(table.item(current_row, 0).text(), table.item(current_row, 3).text(),
                                    table.item(current_row, 4).text(), str(date.today().strftime('%d.%m.%Y')))
+                db.insertLog("Удаление стажера " + table.item(current_row, 0).text(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+                             current_user)
             table.removeRow(current_row)
             if table.rowCount() <= 0:
                 table.hide()
@@ -379,8 +581,8 @@ class TabWidget(QWidget):
                 return QMessageBox.critical(self, 'Ошибка', 'Уберите существующий приказ о зачислении из папки "Документы"')
             db.acceptIntern(self.tableInterns.item(current_row, 0).text(), self.tableInterns.item(current_row, 3).text(),
                                self.tableInterns.item(current_row, 4).text(), str(date.today().strftime('%d.%m.%Y')))
-
-
+            db.insertLog("Перемещение стажера " + self.tableInterns.item(current_row, 0).text(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+                         current_user)
 
             row = self.tableEmployees.rowCount()
             self.tableEmployees.insertRow(row)
@@ -402,6 +604,28 @@ class TabWidget(QWidget):
                 self.lblInterns.show()
             QMessageBox.information(self, 'Успешно', 'Строка была успешно перемещена!')
 
+    def toEditWindow(self):
+        global editWindow
+
+        if self.tab.currentIndex() == 0:
+            table = self.tableEmployees
+            tbl = 0
+        elif self.tab.currentIndex() == 1:
+            table = self.tableInterns
+            tbl = 1
+
+        current_row = table.currentRow()
+        if current_row < 0:
+            return QMessageBox.warning(self, 'Предупреждение', 'Выберите запись для перемещения')
+
+        row = []
+
+        for i in range(8):
+            row.append(table.item(current_row, i).text())
+
+        editWindow = None
+        editWindow = EditWindow(row, tbl)
+
     def addRow(self):
         if not self.valid():
             return
@@ -422,6 +646,8 @@ class TabWidget(QWidget):
                                  self.phone.text().strip(), self.email.text().strip(), position,
                                  self.experience.text().strip(), workplace, today):
                 QMessageBox.information(self, 'Успешно', 'Новый сотрудник успешно добавлен!')
+                db.insertLog("Добавление сотрудника " + self.last_name.text().strip(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+                             current_user)
             else:
                 QMessageBox.critical(self, 'Ошибка', 'Данный сотрудник уже есть в базе данных!')
 
@@ -433,6 +659,8 @@ class TabWidget(QWidget):
                                   self.phone.text().strip(), self.email.text().strip(), position,
                                   self.experience.text().strip(), workplace, today):
                 QMessageBox.information(self, 'Успешно', 'Новый стажер успешно добавлен!')
+                db.insertLog("Добавление стажера " + self.last_name.text().strip(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+                             current_user)
             else:
                 QMessageBox.critical(self, 'Ошибка', 'Данный стажер уже есть в базе данных!')
         else:
@@ -460,6 +688,8 @@ class TabWidget(QWidget):
 
         if db.insertUser(self.loginForm.text().strip(), self.passwordForm.text().strip(), self.codewordForm.text().strip().upper()):
             QMessageBox.information(self, 'Успешно', 'Новый пользователь успешно добавлен!')
+            db.insertLog("Добавление пользователя " + self.loginForm.text().strip(), str(datetime.now().time().strftime("%H:%M:%S")) + " | " + str(date.today().strftime('%d.%m.%Y')),
+                         current_user)
 
         self.resetFormUser()
 

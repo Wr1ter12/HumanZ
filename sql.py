@@ -5,10 +5,12 @@ class db:
         self.connection = sqlite3.connect(db, check_same_thread=False)
         self.cursor = self.connection.cursor()
         self.cursor.execute(
+            'CREATE TABLE IF NOT EXISTS Logs ( id INTEGER PRIMARY KEY AUTOINCREMENT, log TEXT NOT NULL, date TEXT NOT NULL, user TEXT NOT NULL);')
+        self.cursor.execute(
             'CREATE TABLE IF NOT EXISTS Users ( id INTEGER PRIMARY KEY AUTOINCREMENT, login TEXT NOT NULL, password TEXT NOT NULL, permissions TEXT NOT NULL, codeword VARCHAR(6) NOT NULL);')
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS employees ( id INTEGER PRIMARY KEY AUTOINCREMENT, last_name TEXT NOT NULL, first_name TEXT NOT NULL, middle_name TEXT, phone VARCHAR(20) NOT NULL, 
-            email TEXT NOT NULL, positionId INTEGER NOT NULL, experience INTEGER NOT NULL, workplaceId INTEGER NOT NULL, dateOfFiring TEXT NULL, dateOfHiring TEXT NOT NULL, status TEXT DEFAULT 'Принят на работу', FOREIGN KEY (positionId) REFERENCES positions(id), FOREIGN KEY (workplaceId) REFERENCES workplaces(id));""")
+            email TEXT NOT NULL, positionId INTEGER NOT NULL, experience INTEGER NOT NULL, workplaceId INTEGER NOT NULL, dateOfFiring TEXT NULL, dateOfHiring TEXT NULL, status TEXT DEFAULT 'Принят на работу', FOREIGN KEY (positionId) REFERENCES positions(id), FOREIGN KEY (workplaceId) REFERENCES workplaces(id));""")
         self.cursor.execute(
             """CREATE TABLE IF NOT EXISTS interns ( id INTEGER PRIMARY KEY AUTOINCREMENT, last_name TEXT NOT NULL, first_name TEXT NOT NULL, middle_name TEXT, phone VARCHAR(20) NOT NULL, 
             email TEXT NOT NULL, positionId INTEGER NOT NULL, experience INTEGER NOT NULL, workplaceId INTEGER NOT NULL, dateOfFiring TEXT NULL, dateOfHiring TEXT NULL, status TEXT DEFAULT 'Стажируется', FOREIGN KEY (positionId) REFERENCES positions(id), FOREIGN KEY (workplaceId) REFERENCES workplaces(id));""")
@@ -16,12 +18,22 @@ class db:
             'CREATE TABLE IF NOT EXISTS workplaces ( id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, address TEXT NOT NULL);')
         self.cursor.execute(
             'CREATE TABLE IF NOT EXISTS positions ( id INTEGER PRIMARY KEY AUTOINCREMENT, profession TEXT NOT NULL, salary INTEGER NOT NULL);')
+
+        #self.cursor.execute('INSERT INTO Users VALUES (3, "root", "root", "admin", "ABCVDO")')
+        #self.cursor.execute('INSERT INTO workplaces VALUES (1, "Офис ЖТБ", "ул. Волынина 8")')
+        #self.cursor.execute('INSERT INTO positions VALUES (1, "Администратор баз данных", 50000)')
+        #self.cursor.execute('INSERT INTO workplaces VALUES (2, "Офис Серб", "ул. Волынина 8")')
+        #self.cursor.execute('INSERT INTO positions VALUES (2, "Разработчик .NET", 75000)')
         self.connection.commit()
 
     def selectUser(self, login):
         cursor = self.connection.execute('SELECT * FROM Users WHERE (login=?)', (str(login),))
         user = cursor.fetchone()
         return user
+
+    def selectLogs(self):
+        cursor = self.connection.execute('SELECT * FROM Logs')
+        return cursor.fetchall()
 
     def selectEmployees(self):
         cursor = self.connection.execute('SELECT * FROM Employees')
@@ -183,3 +195,11 @@ class db:
         cursor = self.connection.execute('INSERT INTO Users (login, password, permissions, codeword) VALUES (?,?,?,?)', (login, password, "user", codeword))
         self.connection.commit()
         return True
+
+    def insertLog(self, log, date, user):
+        try:
+            cursor = self.connection.execute('INSERT INTO Logs (log, date, user) VALUES (?,?,?)',
+                                             (log, date, user))
+            self.connection.commit()
+        except:
+            pass
