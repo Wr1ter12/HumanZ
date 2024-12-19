@@ -152,12 +152,12 @@ class db:
         result = cursor.fetchall()
         return result
 
-    def deleteEmployee(self, last_name, phone, email, date):
-        cursor = self.connection.execute("UPDATE Employees SET dateOfFiring = " + date + " AND status='Увольнение' WHERE (last_name=? AND phone=? AND email=?)", (last_name, phone, email))
+    def deleteEmployee(self, last_name, phone, email, date=None):
+        cursor = self.connection.execute("UPDATE Employees SET dateOfFiring=?, status='Увольнение' WHERE last_name=? AND phone=? AND email=?", (date, last_name, phone, email))
         self.connection.commit()
 
-    def deleteIntern(self, last_name, phone, email, date):
-        cursor = self.connection.execute("UPDATE interns SET dateOfFiring = " + date + ", status='Увольнение' WHERE (last_name=? AND phone=? AND email=?)", (last_name, phone, email))
+    def deleteIntern(self, last_name, phone, email, date=None):
+        cursor = self.connection.execute("UPDATE interns SET dateOfFiring=?, status='Увольнение' WHERE last_name=? AND phone=? AND email=?", (date, last_name, phone, email))
         self.connection.commit()
 
     def updateTable(self, l, p, e, table, last_name, first_name, middle_name, phone, email, posId, experience, offId):
@@ -178,8 +178,8 @@ class db:
         cursor = self.connection.execute("""INSERT INTO Employees (last_name, first_name, middle_name, phone, 
                                             email, positionId, experience, workplaceId) SELECT last_name, first_name, middle_name, phone, 
                                             email, positionId, experience, workplaceId FROM interns WHERE (last_name=? AND phone=? AND email=?)""", (last_name, phone, email))
-        cursor = self.connection.execute("UPDATE Employees SET dateOfHiring=" + dateOfHiring + ", status='Принят на работу' WHERE last_name=" + last_name + " AND phone=" + phone + " AND email=" + email + ";")
-        self.deleteIntern(last_name, phone, email)
+        cursor = self.connection.execute("UPDATE Employees SET dateOfHiring=?, status='Принят на работу' WHERE last_name=? AND phone=? AND email=?", (dateOfHiring, last_name, phone, email))
+        cursor = self.connection.execute("DELETE FROM interns WHERE (last_name=? AND phone=? AND email=?)", (last_name, phone, email))
         self.connection.commit()
 
     def insertEmployee(self, last_name, first_name, middle_name, phone, email, posId, experience, offId, dateOfHiring):

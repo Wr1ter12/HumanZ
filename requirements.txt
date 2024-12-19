@@ -1,3 +1,5 @@
 pyqt6
 python-docx
 regex
+pandas
+openpyxl

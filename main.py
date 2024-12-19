@@ -10,9 +10,11 @@ from PyQt6.QtWidgets import (
 from re import match
 from sql import db
 from document import docWriter
+from excel import Excel
 
 db = db("HumanZDatabase.db")
 doc = docWriter()
+exc = Excel()
 
 current_user = "guest"
 
@@ -323,7 +325,7 @@ class LogWindow(Window):
 
         self.tableLogs = QTableWidget(self)
         self.tableLogs.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tableLogs.setFixedSize(480, 220)
+        self.tableLogs.setFixedSize(480, 175)
         self.layout.addWidget(self.tableLogs, 1, 0, Qt.AlignmentFlag.AlignTop)
 
         self.tableLogs.setColumnCount(3)
@@ -554,6 +556,11 @@ class TabWidget(QWidget):
         self.layoutTab.addWidget(buttonQuit, 2, 0,
                                  alignment=Qt.AlignmentFlag.AlignLeft)
 
+        buttonExport = QPushButton("Экспортировать")
+        buttonExport.clicked.connect(self.export)
+        self.layoutTab.addWidget(buttonExport, 2, 0,
+                                 alignment=Qt.AlignmentFlag.AlignCenter)
+
         if permission == "admin":
             buttonQuit = QPushButton("Журнал событий")
             buttonQuit.clicked.connect(MainWindow.toLogWindow)
@@ -567,6 +574,27 @@ class TabWidget(QWidget):
     def contextMenuEvent(self, event):
         self.contextMenu.exec(event.globalPos())
 
+    def export(self):
+        button = QMessageBox.question(
+            self,
+            'Подтверждение',
+            'Вы уверены, что хотите экспортировать данную таблицу?',
+            QMessageBox.StandardButton.Yes |
+            QMessageBox.StandardButton.No
+        )
+
+        if button == QMessageBox.StandardButton.Yes:
+            if self.tab.currentIndex() == 0:
+                table = "employees"
+                file = "Сотрудники.xlsx"
+            elif self.tab.currentIndex() == 1:
+                table = "interns"
+                file = "Стажеры.xlsx"
+            else:
+                return
+            exc.fromSQLtoExcel(table, file, db.connection)
+            QMessageBox.information(self, 'Успешно', 'Таблица была успешно экспортирована!')
+
     def deleteRow(self):
         global current_user
 
@@ -577,7 +605,8 @@ class TabWidget(QWidget):
             table = self.tableInterns
             txt = self.lblInterns
         else:
-            return 0
+            return QMessageBox.warning(self, 'Предупреждение',
+                                       'Удаление происходит на вкладках таблиц!')
 
         current_row = table.currentRow()
         if current_row < 0:
@@ -638,7 +667,7 @@ class TabWidget(QWidget):
                                  self.tableInterns.item(current_row, 1).text(),
                                  self.tableInterns.item(current_row, 2).text(), str(date.today().strftime('%d.%m.%Y')),
                                  self.tableInterns.item(current_row, 5).text(),
-                                 str(db.getSalaryByProfession(self.tableInterns.item(current_row, 5).text()))):
+                                 str(db.getSalaryByProfession(self.tableInterns.item(current_row, 5).text())), self.tableInterns.item(current_row, 6).text()):
                 return QMessageBox.critical(self, 'Ошибка',
                                             'Уберите существующий приказ о зачислении из папки "Документы"')
             db.acceptIntern(self.tableInterns.item(current_row, 0).text(),
@@ -678,10 +707,13 @@ class TabWidget(QWidget):
         elif self.tab.currentIndex() == 1:
             table = self.tableInterns
             tbl = 1
+        else:
+            return QMessageBox.warning(self, 'Предупреждение',
+                                       'Изменение возможно только для таблиц!')
 
         current_row = table.currentRow()
         if current_row < 0:
-            return QMessageBox.warning(self, 'Предупреждение', 'Выберите запись для перемещения')
+            return QMessageBox.warning(self, 'Предупреждение', 'Выберите запись для изменения')
 
         row = []
 
@@ -705,7 +737,7 @@ class TabWidget(QWidget):
             if not doc.docHiring(self.last_name.text().strip(), self.first_name.text().strip(),
                                  self.middle_name.text().strip(), today,
                                  self.position.currentText(),
-                                 str(db.getSalaryByProfession(self.position.currentText()))):
+                                 str(db.getSalaryByProfession(self.position.currentText())), self.workplace.currentText()):
                 return QMessageBox.critical(self, 'Ошибка',
                                             'Уберите существующий приказ о зачислении из папки "Документы"')
             if db.insertEmployee(self.last_name.text().strip(), self.first_name.text().strip(),
