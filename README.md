@@ -11,4 +11,4 @@ requirements.txt - Файл с необходимыми библиотеками
 style.qss - Файл, содержащий в себе каскадные таблицы стилей QSS для дизайна приложения.<br />
 HumanZIcon.png/HumanZIcon.ico - Иконки для приложения.
 
-Ссылка на .exe: https://disk.yandex.ru/d/Ldvzm1F9_UjIHQ
+Ссылка на .exe: https://disk.yandex.ru/d/xFhjMwf-O-Dcrg
