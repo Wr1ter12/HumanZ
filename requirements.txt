@@ -3,3 +3,4 @@ python-docx
 regex
 pandas
 openpyxl
+matplotlib
