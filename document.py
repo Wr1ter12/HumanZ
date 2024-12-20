@@ -33,7 +33,6 @@ class configureReader:
 
     def write_file(self):
         with open("config.txt", "w") as f:
-            print(self.comp)
             f.writelines([str(self.comp).replace("\n", "") + "\n", str(self.director).replace("\n", "") + "\n", str(self.city).replace("\n", "") + "\n", str(self.num).replace("\n", "") + "\n"])
 
 

@@ -1,4 +1,5 @@
 import sys
+import matplotlib.pyplot as plt
 from datetime import date, datetime
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
@@ -309,7 +310,7 @@ class LogWindow(Window):
 
     def __init__(self):
         super().__init__()
-        self.setFixedSize(500, 250)
+        self.setFixedSize(600, 300)
 
         self.inputSearch = QLineEdit()
         self.inputSearch.setPlaceholderText("Найти...")
@@ -325,12 +326,12 @@ class LogWindow(Window):
 
         self.tableLogs = QTableWidget(self)
         self.tableLogs.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tableLogs.setFixedSize(480, 175)
+        self.tableLogs.setFixedSize(575, 220)
         self.layout.addWidget(self.tableLogs, 1, 0, Qt.AlignmentFlag.AlignTop)
 
         self.tableLogs.setColumnCount(3)
-        self.tableLogs.setColumnWidth(0, 240)
-        self.tableLogs.setColumnWidth(1, 123)
+        self.tableLogs.setColumnWidth(0, 250)
+        self.tableLogs.setColumnWidth(1, 175)
         self.tableLogs.setColumnWidth(2, 100)
 
         self.tableLogs.setHorizontalHeaderLabels(
@@ -416,8 +417,8 @@ class TabWidget(QWidget):
         self.layoutEmp.addWidget(buttonSearch, 0, 1, Qt.AlignmentFlag.AlignTop)
 
         self.contextMenu = QMenu(self)
-        act1 = self.contextMenu.addAction("Переместить в сотрудники")
-        act1.triggered.connect(self.acceptRow)
+        self.act1 = self.contextMenu.addAction("Переместить в сотрудники")
+        self.act1.triggered.connect(self.acceptRow)
         act2 = self.contextMenu.addAction("Изменить данные")
         act2.triggered.connect(self.toEditWindow)
 
@@ -492,6 +493,16 @@ class TabWidget(QWidget):
         else:
             self.lblInterns.show()
 
+        graphPage = QWidget(self)
+        self.layoutGraph = QGridLayout()
+        graphPage.setLayout(self.layoutGraph)
+        self.comboPlot = QComboBox()
+        self.comboPlot.addItems(["Зарплаты и профессии", "Сотрудники и профессии", "Стажеры и профессии", "Сотрудники и места работы", "Стажеры и места работы"])
+        self.layoutGraph.addWidget(self.comboPlot, 0, 0)
+        self.buttonPlot = QPushButton("Построить диаграмму")
+        self.buttonPlot.clicked.connect(self.buildGraph)
+        self.layoutGraph.addWidget(self.buttonPlot, 1, 0)
+
         if self.perm == "admin":
             formAdd = QWidget(self)
             FormLayout = QFormLayout(formAdd)
@@ -548,6 +559,7 @@ class TabWidget(QWidget):
         if permission == "admin":
             self.tab.addTab(formAdd, 'Добавить')
             self.tab.addTab(formAdd2, 'Пользователи')
+        self.tab.addTab(graphPage, 'Статистика')
 
         self.layoutTab.addWidget(self.tab, 0, 0, 2, 1)
 
@@ -572,7 +584,61 @@ class TabWidget(QWidget):
             w.setGraphicsEffect(shadow)
 
     def contextMenuEvent(self, event):
+        if self.tab.currentIndex() != 0 and self.tab.currentIndex() != 1:
+            return
+        if self.tab.currentIndex() == 0:
+            self.contextMenu.removeAction(self.act1)
+        elif self.tab.currentIndex() == 1:
+            self.contextMenu.addAction(self.act1)
         self.contextMenu.exec(event.globalPos())
+
+
+    def buildGraph(self):
+        ind = self.comboPlot.currentIndex()
+        params1 = [list(i[0] for i in db.selectPositions()), list(i[0] for i in db.selectSalaries()),
+                   "Гистограмма работ и зарплат", "Профессии", "Зарплаты"]
+        params2 = [list(i[0] for i in db.selectProfessionCount(0)), list(i[1] for i in db.selectProfessionCount(0)),
+                   "Гистограмма работ и сотрудников", "Профессии", "Кол-во сотрудников"]
+        params3 = [list(i[0] for i in db.selectProfessionCount(1)), list(i[1] for i in db.selectProfessionCount(1)),
+                   "Гистограмма работ и стажеров", "Профессии", "Кол-во стажеров"]
+        params4 = [list(i[0] for i in db.selectWorkplaceCount(0)), list(i[1] for i in db.selectWorkplaceCount(0)),
+                   "Гистограмма работ и стажеров", "Профессии", "Кол-во стажеров"]
+        params5 = [list(i[0] for i in db.selectWorkplaceCount(1)), list(i[1] for i in db.selectWorkplaceCount(1)),
+                   "Гистограмма работ и стажеров", "Профессии", "Кол-во стажеров"]
+
+        self.params = [params1, params2, params3, params4, params5]
+        x = self.params[ind][0]
+        y = self.params[ind][1]
+        if x == [] or y == []:
+            return QMessageBox.warning(self, 'Предупреждение',
+                                       'Нет данных для построения диаграммы!')
+        title = self.params[ind][2]
+        legendX = self.params[ind][3]
+        legendY = self.params[ind][4]
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+        bar_labels = []
+        tick_labels_x = []
+        for i in x:
+            bar_labels.append(i)
+            try:
+                i = "\n".join(i.split())
+            except:
+                pass
+            tick_labels_x.append(i)
+
+        bar_colors = ['tab:red', 'tab:green', 'tab:blue', 'tab:gray', 'tab:orange', 'tab:pink']
+        ax.bar(x, y, label=bar_labels, color=bar_colors)
+        ax.set_xlabel(legendX)
+        ax.set_ylabel(legendY)
+        ax.set_title(title)
+        ax.set_xticks(x)
+        ax.set_xticklabels(tick_labels_x)
+        ax.legend(title=legendX)
+        fig.canvas.manager.set_window_title('Гистограмма')
+        plt.title("Гистограмма")
+        plt.show()
+
 
     def export(self):
         button = QMessageBox.question(
@@ -591,7 +657,8 @@ class TabWidget(QWidget):
                 table = "interns"
                 file = "Стажеры.xlsx"
             else:
-                return
+                return QMessageBox.warning(self, 'Предупреждение',
+                                       'Экспорт должен происходить на вкладках соответствующих таблиц!')
             exc.fromSQLtoExcel(table, file, db.connection)
             QMessageBox.information(self, 'Успешно', 'Таблица была успешно экспортирована!')
 

@@ -37,6 +37,32 @@ class db:
         cursor = self.connection.execute('SELECT * FROM interns')
         return cursor.fetchall()
 
+    def selectProfessionCount(self, table=0):
+        if table == 0:
+            cursor = self.connection.execute('SELECT positionId FROM Employees WHERE status != "Увольнение"')
+        else:
+            cursor = self.connection.execute('SELECT positionId FROM interns WHERE status != "Увольнение"')
+        pos = {}
+        for i in cursor.fetchall():
+            res = self.selectPositionById(i[0])[0]
+            if res not in pos.keys():
+                pos[res] = 0
+            pos[res] += 1
+        return pos.items()
+
+    def selectWorkplaceCount(self, table=0):
+        if table == 0:
+            cursor = self.connection.execute('SELECT workplaceId FROM Employees WHERE status != "Увольнение"')
+        else:
+            cursor = self.connection.execute('SELECT workplaceId FROM interns WHERE status != "Увольнение"')
+        work = {}
+        for i in cursor.fetchall():
+            res = self.selectWorkplaceById(i[0])[0]
+            if res not in work.keys():
+                work[res] = 0
+            work[res] += 1
+        return work.items()
+
     def selectPositionById(self, id):
         cursor = self.connection.execute('SELECT profession FROM positions WHERE (id=?)', (str(id),))
         return cursor.fetchone()
@@ -47,6 +73,10 @@ class db:
 
     def selectPositions(self):
         cursor = self.connection.execute('SELECT profession FROM positions')
+        return cursor.fetchall()
+
+    def selectSalaries(self):
+        cursor = self.connection.execute('SELECT salary FROM positions')
         return cursor.fetchall()
 
     def selectWorkplaces(self):
